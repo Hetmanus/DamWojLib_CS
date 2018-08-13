@@ -17,6 +17,9 @@ namespace DamWojLib
     {
         static T s_instance;
         public static T singleton { get { return s_instance != null ? s_instance : InstantiateSingleton(); } }
+        /// <summary>
+        /// Use this method to create singelton instance using ctor with no parameters
+        /// </summary>
         public static T InstantiateSingleton()
         {
             if (s_instance == null)
@@ -25,6 +28,9 @@ namespace DamWojLib
             }
             return s_instance;
         }
+        /// <summary>
+        /// Use this method to create singelton instance using ctor with parameters
+        /// </summary>
         public static T InstantiateSingleton(params object[] ctorParameters)
         {
             if (s_instance == null)

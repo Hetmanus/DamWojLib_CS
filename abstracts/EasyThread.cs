@@ -49,10 +49,12 @@ namespace DamWojLib
                 }
                 if (m_watch.ElapsedMilliseconds > cycleSleepTime)
                 {
+                    // if Update execution time longer then min execute time then delta time is equal to execution time
                     m_deltaTime = (int)m_watch.ElapsedMilliseconds;
                 }
                 else
                 {
+                    // if Update execution time shorter then min execute time then wait for remaining amount of time and delta time is equal to min execute time
                     Thread.Sleep(cycleSleepTime - (int)m_watch.ElapsedMilliseconds);
                     m_deltaTime = cycleSleepTime;
                 }

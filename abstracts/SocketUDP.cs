@@ -25,6 +25,10 @@ namespace DamWojLib
         Action<EndPoint, IEnumerable<byte>> m_eRecive;
         object m_eReciveLock = new object();
 
+        //thread safe event change handling 
+        /// <summary>
+        /// Use for observation and debug only, for heavy operations override OnSendTo method
+        /// </summary>
         public event Action<EndPoint, IEnumerable<byte>> eSend
         {
             add
@@ -42,6 +46,10 @@ namespace DamWojLib
                 }
             }
         }
+        //thread safe event change handling 
+        /// <summary>
+        /// Use for observation and debug only, for heavy operations override OnReciveFrom method
+        /// </summary>
         public event Action<EndPoint, IEnumerable<byte>> eRecive
         {
             add
@@ -83,7 +91,7 @@ namespace DamWojLib
             m_reciveBuffers = new ObjectsPoolAsync<byte[]>(() => new byte[receiveBufferSize]);
             m_socket.ReceiveBufferSize = receiveBufferSize;
 
-            #region fixes problem of connecting back to self causing socket to throw exception and stop working
+            #region fixes problem when connecting back to self causing socket to throw exception and stop working if there is no reciver
             int SIO_UDP_CONNRESET = -1744830452;
             byte[] inValue = new byte[] { 0 };
             byte[] outValue = new byte[] { 0 };
@@ -93,7 +101,7 @@ namespace DamWojLib
             m_bindPoint = new IPEndPoint(ip, port);
             m_socket.Bind(m_bindPoint);
 
-            //counting time since last updates
+            //counting time since last updates thread
             uint newValue = 0;
             m_timer = new Timer(o =>
             {
@@ -140,6 +148,7 @@ namespace DamWojLib
         public uint timeSinceLastRecive { get { return m_timeSinceLastRecive; } }
         public uint timeSinceLastSend { get { return m_timeSinceLastSend; } }
 
+        //recive thread
         void reciveCallback(IAsyncResult ar)
         {
             ReciveState state = (ReciveState)ar.AsyncState;
@@ -151,6 +160,7 @@ namespace DamWojLib
             }
             catch (ObjectDisposedException e)
             {
+                //sometimes when disposing not all processes finish in time, this should not cause leaks but will throw exception
                 if (e.ObjectName != "System.Net.Sockets.Socket")
                 {
                     throw e;
@@ -162,6 +172,7 @@ namespace DamWojLib
             }
             catch (SocketException e)
             {
+                //some future exception handling, mabey
                 switch (e.SocketErrorCode)
                 {
                     default: throw e;
@@ -189,9 +200,11 @@ namespace DamWojLib
             }
             finally
             {
+                //buffer must return to pool even if exception have been thrown
                 m_reciveBuffers.Store(state.buffer);
             }
         }
+        //send thread
         void sendCallback(IAsyncResult ar)
         {
             SendState state = (SendState)ar.AsyncState;
@@ -259,7 +272,13 @@ namespace DamWojLib
             return true;
         }
 
+        /// <summary>
+        /// Called by Sending thread when sending data
+        /// </summary>
         protected virtual void OnSendTo(EndPoint target, IEnumerator<byte> data, SocketFlags flag) { }
+        /// <summary>
+        /// Called by Reciving thread when reciving data
+        /// </summary>
         protected virtual void OnReciveFrom(EndPoint source, IEnumerator<byte> data, SocketFlags flag) { }
 
         public override string ToString()
@@ -269,6 +288,9 @@ namespace DamWojLib
                 m_socket.AddressFamily, m_socket.SocketType, m_socket.ProtocolType, port, sendBufferSize, receiveBufferSize);
         }
 
+        /// <summary>
+        /// Thread safe method allowing for check if object is disposed
+        /// </summary>
         protected void ThrowIfDisposing()
         {
             if (m_disposing)
